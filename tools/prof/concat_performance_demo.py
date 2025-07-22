@@ -2,6 +2,13 @@ import torch
 import paddle
 import numpy
 import time
+import os
+
+os.environ["NVIDIA_TF32_OVERRIDE"] = "0"
+# os.environ["FLAGS_use_system_allocator"] = "0"
+# os.environ["FLAGS_share_tensor_for_grad_tensor_holder"] = "1"
+paddle.framework.set_flags({"FLAGS_use_system_allocator": False})
+paddle.framework.set_flags({"FLAGS_share_tensor_for_grad_tensor_holder": True})
 
 device = torch.device("cuda:0")
 torch.set_default_device(device)
@@ -21,40 +28,31 @@ def init_input(numpy_tensor):
     )
     return paddle_x, torch_x
 
-# paddle.concat(list[Tensor([4, 178176, 1],"float32"),Tensor([4, 44544, 1],"float32"),Tensor([4, 11136, 1],"float32"),Tensor([4, 2784, 1],"float32"),Tensor([4, 720, 1],"float32"),], axis=1, )
+# paddle.concat(list[Tensor([512, 32, 112, 112],"float16"),Tensor([512, 32, 112, 112],"float16"),], axis=1, )
 
-m =  4
-n1 = 178176
-n2 = 44544
-n3 = 11136
-n4 = 2784
-n5 = 720
-k = 1
+m = 512
+n = 32
+k = 112
+l = 112
 
-test_loop = 240662
-numpy_tensor1 = (numpy.random.random([m, n1, k]) - 0.5).astype("float32")
-numpy_tensor2 = (numpy.random.random([m, n2, k]) - 0.5).astype("float32")
-numpy_tensor3 = (numpy.random.random([m, n3, k]) - 0.5).astype("float32")
-numpy_tensor4 = (numpy.random.random([m, n4, k]) - 0.5).astype("float32")
-numpy_tensor5 = (numpy.random.random([m, n5, k]) - 0.5).astype("float32")
+test_loop = 3901
+numpy_tensor1 = (numpy.random.random([m, n, k, l]) - 0.5).astype("float16")
+numpy_tensor2 = (numpy.random.random([m, n, k, l]) - 0.5).astype("float16")
 paddle_x1, torch_x1 = init_input(numpy_tensor1)
 paddle_x2, torch_x2 = init_input(numpy_tensor2)
-paddle_x3, torch_x3 = init_input(numpy_tensor3)
-paddle_x4, torch_x4 = init_input(numpy_tensor4)
-paddle_x5, torch_x5 = init_input(numpy_tensor5)
-numel = (numpy_tensor1.size + numpy_tensor2.size + numpy_tensor3.size + numpy_tensor4.size + numpy_tensor5.size)
-test_loop = 2147483647 * 20 // numel
+numel = (numpy_tensor1.size + numpy_tensor2.size)
+# test_loop = 2147483647 * 20 // numel
 print("numel=", numel , "test_loop=", test_loop)
 
 print(torch_x1.device)
 
-paddle_out = paddle.concat((paddle_x1, paddle_x2, paddle_x3, paddle_x4, paddle_x5), axis=1)
+paddle_out = paddle.concat((paddle_x1, paddle_x2), axis=1)
 
 with paddle.no_grad():
     paddle.base.core._cuda_synchronize(paddle.CUDAPlace(0))
     start = time.time()
     for i in range(test_loop):
-        paddle.concat((paddle_x1, paddle_x2, paddle_x3, paddle_x4, paddle_x5), axis=1)
+        paddle.concat((paddle_x1, paddle_x2), axis=1)
     paddle.base.core._cuda_synchronize(paddle.CUDAPlace(0))
     end = time.time()
     timeused = end - start
@@ -72,13 +70,13 @@ end = time.time()
 timeused = end - start
 print("paddle backward", timeused)
 
-torch_out = torch.concat((torch_x1, torch_x2, torch_x3, torch_x4, torch_x5), axis=1)
+torch_out = torch.concat((torch_x1, torch_x2), axis=1)
 
 with torch.no_grad():
     torch.cuda.synchronize()
     start = time.time()
     for i in range(test_loop):
-        torch.concat((torch_x1, torch_x2, torch_x3, torch_x4, torch_x5), axis=1)
+        torch.concat((torch_x1, torch_x2), axis=1)
     torch.cuda.synchronize()
     end = time.time()
     timeused = end - start
@@ -87,7 +85,7 @@ with torch.no_grad():
 torch.cuda.synchronize()
 start = time.time()
 for i in range(test_loop):
-    torch.autograd.grad([torch_out], [torch_x1, torch_x2, torch_x3, torch_x4, torch_x5], grad_outputs=torch_grad, retain_graph=True)
+    torch.autograd.grad([torch_out], [torch_x1, torch_x2], grad_outputs=torch_grad, retain_graph=True)
 torch.cuda.synchronize()
 end = time.time()
 timeused = end - start

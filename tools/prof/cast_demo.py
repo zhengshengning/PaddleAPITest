@@ -14,6 +14,7 @@ device = torch.device("cuda:0")
 torch.set_default_device(device)
 paddle.device.set_device('gpu:0')
 
+
 def init_input(numpy_tensor):
     paddle_x = paddle.to_tensor(numpy_tensor)
     torch_x = torch.tensor(numpy_tensor, requires_grad=True)
@@ -28,31 +29,43 @@ def init_input(numpy_tensor):
     )
     return paddle_x, torch_x
 
-# paddle.Tensor.sum(Tensor([106496, 3584],"float32"), axis=-1, )
+# paddle.cast(Tensor([2, 1, 32768, 32768],"float16"), dtype=Dtype(float16), )
 
-m = 106496
+# paddle.Tensor.cast(Tensor([128256, 4096],"float16"), Dtype(float16), )
+# paddle.Tensor.cast(Tensor([3584, 152064],"float16"), Dtype(float16), )
+# paddle.Tensor.cast(Tensor([152064, 3584],"float16"), Dtype(float16), )
+
+# m = 2
+# n = 1
+# k = 32768
+# l = 32768
+# test_loop = 5170
+
+m = 152064
 n = 3584
-test_loop = 9074
-numpy_tensor = (numpy.random.random([m, n]) - 0.5).astype("float32")
+test_loop = 6064
+# numpy_tensor = (numpy.random.random([m, n, k, l]) - 0.5).astype("float16")
+numpy_tensor = (numpy.random.random([m, n]) - 0.5).astype("float16")
 paddle_x, torch_x = init_input(numpy_tensor)
 numel = (numpy_tensor.size)
 # test_loop = 2147483647 * 20 // numel
 print("numel=", numel , "test_loop=", test_loop)
 
 
-paddle_out = paddle.Tensor.sum(paddle_x, axis=1)
+# paddle_out = paddle.cast(paddle_x, 'float16')
+paddle_out = paddle.Tensor.cast(paddle_x, 'float16')
 
 with paddle.no_grad():
     paddle.base.core._cuda_synchronize(paddle.CUDAPlace(0))
     start = time.time()
     for i in range(test_loop):
-        paddle.Tensor.sum(paddle_x, axis=1)
+        paddle.Tensor.cast(paddle_x, 'float16')
     paddle.base.core._cuda_synchronize(paddle.CUDAPlace(0))
     end = time.time()
     timeused = end - start
     print("paddle forward", timeused)
 
-numpy_tensor = (numpy.random.random([m]) - 0.5).astype("float32")
+numpy_tensor = (numpy.random.random(paddle_out.shape) - 0.5).astype("float16")
 paddle_grad, torch_grad = init_input(numpy_tensor)
 
 try:
@@ -69,13 +82,13 @@ except Exception as e:
 
 
 
-torch_out = torch.Tensor.sum(torch_x, axis=1)
+torch_out = torch_x.to(torch.float16)
 print(torch_out.shape)
 with torch.no_grad():
     torch.cuda.synchronize()
     start = time.time()
     for i in range(test_loop):
-        torch.Tensor.sum(torch_x, axis=1)
+        torch_x.to(torch.float16)
     torch.cuda.synchronize()
     end = time.time()
     timeused = end - start

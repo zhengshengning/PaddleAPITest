@@ -2,6 +2,13 @@ import torch
 import paddle
 import numpy
 import time
+import os
+
+os.environ["NVIDIA_TF32_OVERRIDE"] = "0"
+# os.environ["FLAGS_use_system_allocator"] = "0"
+# os.environ["FLAGS_share_tensor_for_grad_tensor_holder"] = "1"
+paddle.framework.set_flags({"FLAGS_use_system_allocator": False})
+paddle.framework.set_flags({"FLAGS_share_tensor_for_grad_tensor_holder": True})
 
 device = torch.device("cuda:0")
 torch.set_default_device(device)
@@ -21,16 +28,16 @@ def init_input(numpy_tensor):
     )
     return paddle_x, torch_x
 
-# paddle.topk(Tensor([4, 205923],"float32"), k=1, axis=0, )
+# paddle.topk(Tensor([53, 369303],"float32"), k=1, axis=0, )
 
-m = 4
-n = 205923
+m = 53
+n = 369303
 k = 1
-test_loop = 240662
+test_loop = 14745
 numpy_tensor = (numpy.random.random([m, n]) - 0.5).astype("float32")
 paddle_x, torch_x = init_input(numpy_tensor)
 numel = (numpy_tensor.size)
-test_loop = 2147483647 * 20 // numel
+# test_loop = 2147483647 * 20 // numel
 print("numel=", numel , "test_loop=", test_loop)
 
 print(torch_x.device)
